@@ -9,14 +9,14 @@ test("device emite documento válido", () => {
   validate("device", createDevice("dev-wear-001"));
 });
 
-test("session emite documento válido con consentimiento (D15)", () => {
-  const s = startSession({ deviceId: "dev-wear-001", assetId: "asset-001" });
+test("session emite documento válido con consentimiento (D15)", async () => {
+  const s = await startSession({ deviceId: "dev-wear-001", assetId: "asset-001" });
   validate("session", s);
   assert.equal(s.consent.recorded, true);
 });
 
-test("media-item emite documento válido con geometría WGS84", () => {
-  const m = captureImage({ sessionId: "sess-1", assetId: "asset-001" });
+test("media-item emite documento válido con geometría WGS84", async () => {
+  const m = await captureImage({ sessionId: "sess-1", assetId: "asset-001" });
   validate("media-item", m);
   assert.equal(m.geometry.type, "Point");
 });

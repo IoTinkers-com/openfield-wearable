@@ -58,7 +58,7 @@ $("consent").addEventListener("change", () => {
 });
 
 $("start").addEventListener("click", async () => {
-  session = startSession({ deviceId, assetId: "asset-001" }, hw);
+  session = await startSession({ deviceId, assetId: "asset-001" }, hw);
   queue.push({ kind: "doc", entity: "device", doc: createDevice(deviceId, hw) });
   queue.push({ kind: "doc", entity: "session", doc: session });
   log("sesión iniciada: " + session.id);
@@ -77,7 +77,7 @@ $("start").addEventListener("click", async () => {
 $("capture").addEventListener("click", async () => {
   try {
     const img = await hw.captureImage($("preview")); // reusa el stream del preview
-    const doc = captureImage({ sessionId: session.id, assetId: "asset-001", href: img.href }, hw);
+    const doc = await captureImage({ sessionId: session.id, assetId: "asset-001", href: img.href }, hw);
     queue.push({ kind: "media", doc, blob: img.blob });
     $("sync").textContent = `Sincronizar (${queue.length})`;
     log("foto capturada: " + doc.id);

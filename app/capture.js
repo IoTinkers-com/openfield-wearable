@@ -31,9 +31,9 @@ export function createDevice(deviceId = newId("dev"), hw = simulatedHardware()) 
   };
 }
 
-export function startSession({ deviceId, assetId = null } = {}, hw = simulatedHardware()) {
+export async function startSession({ deviceId, assetId = null } = {}, hw = simulatedHardware()) {
   const caps = hw.capabilities();
-  const loc = hw.getLocation();
+  const loc = await hw.getLocation();
   return {
     schema_version: SCHEMA_VERSION,
     tenant_id: TENANT_ID,
@@ -51,9 +51,9 @@ export function startSession({ deviceId, assetId = null } = {}, hw = simulatedHa
   };
 }
 
-export function captureImage({ sessionId, assetId, href, geometry, seq = 1 } = {}, hw = simulatedHardware()) {
+export async function captureImage({ sessionId, assetId, href, geometry, seq = 1 } = {}, hw = simulatedHardware()) {
   const img = href ? { href } : hw.captureImage(seq); // { href, blob? }
-  const loc = geometry ?? hw.getLocation();
+  const loc = geometry ?? (await hw.getLocation());
   return {
     schema_version: SCHEMA_VERSION,
     tenant_id: TENANT_ID,
