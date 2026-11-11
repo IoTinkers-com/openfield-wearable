@@ -18,8 +18,13 @@ schemas/               # contrato canónico (vendored)
 ## Uso
 ```sh
 npm install
-npm test        # valida que la captura simulada emite documentos válidos
+npm test        # valida que la captura emite documentos válidos (Node)
 ```
+
+## Fase 1 (PWA real, en navegador)
+1. Levanta la plataforma: en `openfield-platform` corre `docker compose up`.
+2. Sirve este repo: `python -m http.server 8080`.
+3. Abre `http://localhost:8080/public/` (requiere cámara). En el teléfono, usa túnel HTTPS (ADR-0011).
 
 ## Fase 1 (pendiente)
 Implementación web real de la capa de hardware (`hardware/web.js`): MediaDevices,

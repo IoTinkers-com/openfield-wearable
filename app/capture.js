@@ -1,19 +1,24 @@
 // Flujo de captura: produce documentos canónicos usando la capa de hardware.
+// `hw` es inyectable (default: simulada) para poder usar la implementación web en el navegador.
 import { newId, now } from "./ids.js";
 import { simulatedHardware } from "./hardware/simulated.js";
 
 const TENANT_ID = "tenant-001";
 const SCHEMA_VERSION = "1.0";
 
-export function createDevice(deviceId = newId("dev")) {
-  const caps = simulatedHardware().capabilities();
+function toPoint(loc) {
+  return loc ? { type: "Point", coordinates: [loc.lon, loc.lat] } : null;
+}
+
+export function createDevice(deviceId = newId("dev"), hw = simulatedHardware()) {
+  const caps = hw.capabilities();
   return {
     schema_version: SCHEMA_VERSION,
     tenant_id: TENANT_ID,
     id: deviceId,
-    name: "Wearable simulado",
+    name: "Wearable",
     device_capabilities: {
-      model: "simulator",
+      model: "web",
       os: "n/a",
       thermal_level: caps.thermal_level,
       thermal_sensor_model: null,
@@ -26,10 +31,9 @@ export function createDevice(deviceId = newId("dev")) {
   };
 }
 
-export function startSession({ deviceId, assetId = null } = {}) {
-  const hw = simulatedHardware();
-  const loc = hw.getLocation();
+export function startSession({ deviceId, assetId = null } = {}, hw = simulatedHardware()) {
   const caps = hw.capabilities();
+  const loc = hw.getLocation();
   return {
     schema_version: SCHEMA_VERSION,
     tenant_id: TENANT_ID,
@@ -39,22 +43,17 @@ export function startSession({ deviceId, assetId = null } = {}) {
     asset_id: assetId,
     started_at: now(),
     ended_at: null,
-    location: loc ? { type: "Point", coordinates: [loc.lon, loc.lat] } : null,
-    device_capabilities: {
-      thermal_level: caps.thermal_level,
-      gps: caps.gps,
-      audio: caps.audio,
-    },
+    location: toPoint(loc),
+    device_capabilities: { thermal_level: caps.thermal_level, gps: caps.gps, audio: caps.audio },
     // D15: consentimiento + indicador de grabación antes de capturar.
     consent: { recorded: true, method: "checkbox" },
     created_at: now(),
   };
 }
 
-export function captureImage({ sessionId, assetId, seq = 1 } = {}) {
-  const hw = simulatedHardware();
-  const loc = hw.getLocation();
-  const img = hw.captureImage(seq);
+export function captureImage({ sessionId, assetId, href, geometry, seq = 1 } = {}, hw = simulatedHardware()) {
+  const img = hw.captureImage(seq); // { href, blob? }
+  const loc = geometry ?? hw.getLocation();
   return {
     schema_version: SCHEMA_VERSION,
     tenant_id: TENANT_ID,
@@ -63,16 +62,16 @@ export function captureImage({ sessionId, assetId, seq = 1 } = {}) {
     asset_id: assetId,
     type: "image",
     captured_at: now(),
-    geometry: loc ? { type: "Point", coordinates: [loc.lon, loc.lat] } : null,
-    assets: { primary: { href: img.href, media_type: "image/jpeg" } },
+    geometry: toPoint(loc),
+    assets: { primary: { href: href || img.href, media_type: "image/jpeg" } },
     thermal_capture_id: null,
     transcript_id: null,
     created_at: now(),
   };
 }
 
-export function recordAudio({ sessionId, assetId, engine = "simulated" } = {}) {
-  const audio = simulatedHardware().recordAudio();
+export function recordAudio({ sessionId, assetId, engine = "simulated", text } = {}, hw = simulatedHardware()) {
+  const audio = hw.recordAudio(); // { href, text, blob? }
   return {
     schema_version: SCHEMA_VERSION,
     tenant_id: TENANT_ID,
@@ -80,7 +79,7 @@ export function recordAudio({ sessionId, assetId, engine = "simulated" } = {}) {
     media_item_id: audio.href ? newId("media") : null,
     session_id: sessionId,
     asset_id: assetId,
-    text: audio.text,
+    text: text ?? audio.text,
     language: "es",
     engine, // D7: registrar qué motor generó la transcripción
     confidence: 0.95,

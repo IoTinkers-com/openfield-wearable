@@ -1,0 +1,64 @@
+// Implementación web real de la capa de hardware (Fase 1).
+// Solo funciona en el navegador (getUserMedia, Geolocation, MediaRecorder).
+import { assertHardware } from "./interface.js";
+
+function dataUrlFromBlob(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+export function webHardware() {
+  return assertHardware({
+    capabilities() {
+      return {
+        thermal_level: null, // sin térmica en la web (T0 = imagen normal)
+        gps: "geolocation" in navigator,
+        audio: Boolean(navigator.mediaDevices?.getUserMedia),
+      };
+    },
+    async getLocation() {
+      if (!("geolocation" in navigator)) return null;
+      return new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lon: pos.coords.longitude, lat: pos.coords.latitude }),
+          () => resolve(null),
+          { enableHighAccuracy: true, timeout: 10000 },
+        );
+      });
+    },
+    async captureImage() {
+      // cámara -> fotograma a canvas -> blob + dataURL
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const track = stream.getVideoTracks()[0];
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      await video.play();
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+      track.stop();
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.8));
+      const href = await dataUrlFromBlob(blob);
+      return { href, blob };
+    },
+    async recordAudio() {
+      // audio corto; la transcripción (Whisper WASM por validar, ADR-0008) es Fase 1.
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      const stopped = new Promise((resolve) => (recorder.onstop = resolve));
+      recorder.start();
+      await new Promise((r) => setTimeout(r, 3000));
+      recorder.stop();
+      await stopped;
+      stream.getTracks().forEach((t) => t.stop());
+      return { href: null, blob: new Blob(chunks, { type: "audio/webm" }), text: null };
+    },
+  });
+}

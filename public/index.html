@@ -5,15 +5,107 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="manifest" href="manifest.webmanifest">
 <title>OpenField · Captura</title>
+<style>
+  body { font-family: sans-serif; margin: 1rem; max-width: 720px; }
+  video { width: 100%; max-width: 480px; border-radius: 6px; background: #000; }
+  .row { margin: 0.75rem 0; }
+  .indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #ccc; margin-right: 6px; }
+  .indicator.on { background: #e11; }
+  #status { color: #555; font-size: 0.9rem; }
+  button { padding: 0.5rem 1rem; margin-right: 0.5rem; }
+  button:disabled { opacity: 0.5; }
+  #log { white-space: pre-wrap; font-family: monospace; font-size: 0.8rem; background: #f5f5f5; padding: 0.5rem; min-height: 3rem; }
+</style>
 </head>
 <body>
-<h1>OpenField · Captura (esqueleto Fase 0)</h1>
-<p>
-  La captura real (cámara, GPS, micrófono) llega en Fase 1. En Fase 0 se valida la
-  <em>capa de hardware desacoplada</em> con una implementación simulada que emite los
-  documentos canónicos (<code>Session</code>, <code>MediaItem</code>, <code>Transcript</code>).
-</p>
-<p>Límites iOS/Safari documentados (ADR-0008): sin Background Sync, IndexedDB purgable,
-sin WebUSB/WebBluetooth, GPS solo en primer plano.</p>
+<h1>OpenField · Captura</h1>
+<div class="row">
+  <label><input type="checkbox" id="consent"> Acepto el registro de captura</label>
+  <span class="indicator" id="indicator" title="Indicador de grabación (D15)"></span>
+</div>
+<div class="row"><video id="preview" autoplay playsinline muted></video></div>
+<div class="row">
+  <button id="start" disabled>Iniciar sesión</button>
+  <button id="capture" disabled>Capturar foto</button>
+  <button id="audio" disabled>Nota de audio</button>
+  <button id="sync" disabled>Sincronizar (0)</button>
+</div>
+<div id="status"></div>
+<h2>Log</h2>
+<div id="log"></div>
+
+<script type="module">
+// Sirve el repo raíz (p. ej. `python -m http.server`) y abre /public/.
+import { webHardware } from "/app/hardware/web.js";
+import { createDevice, startSession, captureImage, recordAudio } from "/app/capture.js";
+import { uploadMedia, ingest } from "/app/sync.js";
+import { newId } from "/app/ids.js";
+
+const BASE_URL = "http://localhost:8000";
+const hw = webHardware();
+const queue = []; // { kind: "media", doc, blob } | { kind: "doc", entity, doc }
+let session = null;
+const deviceId = newId("dev");
+let stream = null;
+
+const $ = (id) => document.getElementById(id);
+const log = (msg) => { $("log").textContent += msg + "\n"; };
+
+$("consent").addEventListener("change", () => {
+  const on = $("consent").checked;
+  $("indicator").className = "indicator" + (on ? " on" : "");
+  $("start").disabled = !on;
+});
+
+$("start").addEventListener("click", async () => {
+  session = startSession({ deviceId, assetId: "asset-001" }, hw);
+  queue.push({ kind: "doc", entity: "device", doc: createDevice(deviceId, hw) });
+  queue.push({ kind: "doc", entity: "session", doc: session });
+  $("capture").disabled = false;
+  $("audio").disabled = false;
+  $("sync").disabled = false;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    $("preview").srcObject = stream;
+  } catch (e) { log("cámara no disponible: " + e.message); }
+  log("sesión iniciada: " + session.id);
+});
+
+$("capture").addEventListener("click", async () => {
+  const img = await hw.captureImage(); // { href (dataURL), blob }
+  const doc = captureImage({ sessionId: session.id, assetId: "asset-001", href: img.href }, hw);
+  queue.push({ kind: "media", doc, blob: img.blob });
+  $("sync").textContent = `Sincronizar (${queue.length})`;
+  log("foto capturada: " + doc.id);
+});
+
+$("audio").addEventListener("click", async () => {
+  // Fase 1: se registra el audio; la transcripción (Whisper WASM por validar) es posterior.
+  const doc = recordAudio({ sessionId: session.id, assetId: "asset-001", engine: "placeholder", text: "(audio pendiente de transcripción)" }, hw);
+  queue.push({ kind: "doc", entity: "transcript", doc });
+  $("sync").textContent = `Sincronizar (${queue.length})`;
+  log("audio registrado: " + doc.id);
+});
+
+$("sync").addEventListener("click", async () => {
+  const items = queue.splice(0, queue.length);
+  for (const item of items) {
+    try {
+      if (item.kind === "media") {
+        const up = await uploadMedia(item.blob, item.doc.id + ".jpg", BASE_URL);
+        item.doc.assets.primary.href = up.href;
+        await ingest("media-item", item.doc, BASE_URL);
+      } else {
+        await ingest(item.entity, item.doc, BASE_URL);
+      }
+      log("ok: " + item.doc.id);
+    } catch (e) {
+      log("error: " + e.message);
+      queue.push(item); // reintentar luego (D4)
+    }
+  }
+  $("sync").textContent = `Sincronizar (${queue.length})`;
+});
+</script>
 </body>
 </html>
