@@ -18,3 +18,11 @@ export async function ingest(entityType, doc, baseUrl = "http://localhost:8000")
   if (!res.ok) throw new Error(`ingest failed: ${res.status}`);
   return res.json();
 }
+
+export async function transcribeAudio(blob, baseUrl = "http://localhost:8000") {
+  const form = new FormData();
+  form.append("file", blob, "audio.webm");
+  const res = await fetch(`${baseUrl}/transcribe`, { method: "POST", body: form });
+  if (!res.ok) throw new Error(`transcribe failed: ${res.status}`);
+  return res.json(); // { text, engine }
+}

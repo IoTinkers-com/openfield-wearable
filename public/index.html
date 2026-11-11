@@ -38,7 +38,7 @@
 // Sirve el repo raíz (p. ej. `python -m http.server`) y abre /public/.
 import { webHardware } from "/app/hardware/web.js";
 import { createDevice, startSession, captureImage, recordAudio } from "/app/capture.js";
-import { uploadMedia, ingest } from "/app/sync.js";
+import { uploadMedia, ingest, transcribeAudio } from "/app/sync.js";
 import { newId } from "/app/ids.js";
 
 const BASE_URL = "http://localhost:8000";
@@ -90,12 +90,15 @@ $("capture").addEventListener("click", async () => {
   } catch (e) { log("error al capturar: " + e.message); }
 });
 
-$("audio").addEventListener("click", () => {
-  // Fase 1: transcripción diferida (Whisper WASM por validar, ADR-0008). Aquí solo la nota de texto.
-  const doc = recordAudio({ sessionId: session.id, assetId: "asset-001", engine: "placeholder", text: "(audio pendiente de transcripción)" });
-  queue.push({ kind: "doc", entity: "transcript", doc });
-  $("sync").textContent = `Sincronizar (${queue.length})`;
-  log("nota registrada: " + doc.id);
+$("audio").addEventListener("click", async () => {
+  try {
+    const audio = await hw.recordAudio(); // graba y devuelve { blob }
+    const result = await transcribeAudio(audio.blob, BASE_URL); // { text, engine }
+    const doc = recordAudio({ sessionId: session.id, assetId: "asset-001", engine: result.engine || "stub", text: result.text || "(sin transcripción)" });
+    queue.push({ kind: "doc", entity: "transcript", doc });
+    $("sync").textContent = `Sincronizar (${queue.length})`;
+    log("transcripción: " + doc.id + " (motor " + doc.engine + ")");
+  } catch (e) { log("error audio: " + e.message); }
 });
 
 $("sync").addEventListener("click", async () => {
