@@ -27,6 +27,7 @@
 <div class="row">
   <button id="start" disabled>Iniciar sesión</button>
   <button id="capture" disabled>Capturar foto</button>
+  <label>Audio (s): <input id="duration" type="number" min="1" max="120" value="3" style="width:3.5rem"></label>
   <button id="audio" disabled>Nota de audio</button>
   <button id="sync" disabled>Sincronizar (0)</button>
 </div>
@@ -95,8 +96,9 @@ $("audio").addEventListener("click", async () => {
   const btn = $("audio");
   btn.disabled = true;
   try {
-    status.textContent = "🔴 Grabando… (3 s) — habla";
-    const audio = await hw.recordAudio(); // graba y devuelve { blob }
+    const secs = parseInt($("duration").value, 10) || 3;
+    status.textContent = "🔴 Grabando… (" + secs + " s) — habla";
+    const audio = await hw.recordAudio(secs * 1000); // graba y devuelve { blob }
     status.textContent = "⏳ Transcribiendo…";
     const result = await transcribeAudio(audio.blob, BASE_URL); // { text, engine }
     const doc = recordAudio({ sessionId: session.id, assetId: "asset-001", engine: result.engine || "stub", text: result.text || "(sin transcripción)" });

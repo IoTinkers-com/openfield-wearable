@@ -41,15 +41,16 @@ export function webHardware() {
       const href = await dataUrlFromBlob(blob);
       return { href, blob };
     },
-    async recordAudio() {
-      // audio corto; la transcripción (Whisper WASM por validar, ADR-0008) es Fase 1.
+    async recordAudio(durationMs = 3000) {
+      // Duración configurable. La transcripción local (Whisper WASM por validar, ADR-0008)
+      // se reserva para una fase posterior; hoy transcribe el backend.
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       const chunks = [];
       recorder.ondataavailable = (e) => chunks.push(e.data);
       const stopped = new Promise((resolve) => (recorder.onstop = resolve));
       recorder.start();
-      await new Promise((r) => setTimeout(r, 3000));
+      await new Promise((r) => setTimeout(r, durationMs));
       recorder.stop();
       await stopped;
       stream.getTracks().forEach((t) => t.stop());
