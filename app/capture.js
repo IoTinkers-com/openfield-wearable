@@ -53,7 +53,7 @@ export async function startSession({ deviceId, assetId = null } = {}, hw = simul
 
 export async function captureImage({ sessionId, assetId, href, geometry, seq = 1 } = {}, hw = simulatedHardware()) {
   const img = href ? { href } : hw.captureImage(seq); // { href, blob? }
-  const loc = geometry ?? (await hw.getLocation());
+  const loc = geometry !== undefined ? geometry : (await hw.getLocation());
   return {
     schema_version: SCHEMA_VERSION,
     tenant_id: TENANT_ID,

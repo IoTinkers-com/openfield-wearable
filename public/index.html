@@ -45,6 +45,7 @@ const BASE_URL = "http://localhost:8000";
 const hw = webHardware();
 const queue = []; // { kind: "media", doc, blob } | { kind: "doc", entity, doc }
 let session = null;
+let assetLocation = null; // fallback interior (D2: QR/TAG del activo)
 const deviceId = newId("dev");
 let stream = null;
 
@@ -63,6 +64,10 @@ $("start").addEventListener("click", async () => {
   queue.push({ kind: "doc", entity: "session", doc: session });
   log("sesión iniciada: " + session.id);
   try {
+    const res = await fetch(`${BASE_URL}/documents/asset-001`);
+    if (res.ok) assetLocation = (await res.json()).location || null;
+  } catch {}
+  try {
     if (stream) stream.getTracks().forEach((t) => t.stop()); // libera cámara previa
     stream = await navigator.mediaDevices.getUserMedia({ video: true });
     $("preview").srcObject = stream;
@@ -77,10 +82,11 @@ $("start").addEventListener("click", async () => {
 $("capture").addEventListener("click", async () => {
   try {
     const img = await hw.captureImage($("preview")); // reusa el stream del preview
-    const doc = await captureImage({ sessionId: session.id, assetId: "asset-001", href: img.href }, hw);
+    const loc = await hw.getLocation();
+    const doc = await captureImage({ sessionId: session.id, assetId: "asset-001", href: img.href, geometry: loc || assetLocation }, hw);
     queue.push({ kind: "media", doc, blob: img.blob });
     $("sync").textContent = `Sincronizar (${queue.length})`;
-    log("foto capturada: " + doc.id);
+    log("foto capturada: " + doc.id + (loc ? " (GPS)" : assetLocation ? " (ubicación del activo)" : " (sin ubicación)"));
   } catch (e) { log("error al capturar: " + e.message); }
 });
 
