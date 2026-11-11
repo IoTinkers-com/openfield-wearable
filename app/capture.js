@@ -52,7 +52,7 @@ export function startSession({ deviceId, assetId = null } = {}, hw = simulatedHa
 }
 
 export function captureImage({ sessionId, assetId, href, geometry, seq = 1 } = {}, hw = simulatedHardware()) {
-  const img = hw.captureImage(seq); // { href, blob? }
+  const img = href ? { href } : hw.captureImage(seq); // { href, blob? }
   const loc = geometry ?? hw.getLocation();
   return {
     schema_version: SCHEMA_VERSION,
@@ -63,23 +63,22 @@ export function captureImage({ sessionId, assetId, href, geometry, seq = 1 } = {
     type: "image",
     captured_at: now(),
     geometry: toPoint(loc),
-    assets: { primary: { href: href || img.href, media_type: "image/jpeg" } },
+    assets: { primary: { href: img.href, media_type: "image/jpeg" } },
     thermal_capture_id: null,
     transcript_id: null,
     created_at: now(),
   };
 }
 
-export function recordAudio({ sessionId, assetId, engine = "simulated", text } = {}, hw = simulatedHardware()) {
-  const audio = hw.recordAudio(); // { href, text, blob? }
+export function recordAudio({ sessionId, assetId, engine = "simulated", text = "(transcripción pendiente)" } = {}) {
   return {
     schema_version: SCHEMA_VERSION,
     tenant_id: TENANT_ID,
     id: newId("tr"),
-    media_item_id: audio.href ? newId("media") : null,
+    media_item_id: null,
     session_id: sessionId,
     asset_id: assetId,
-    text: text ?? audio.text,
+    text,
     language: "es",
     engine, // D7: registrar qué motor generó la transcripción
     confidence: 0.95,

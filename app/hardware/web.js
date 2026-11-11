@@ -30,18 +30,13 @@ export function webHardware() {
         );
       });
     },
-    async captureImage() {
-      // cámara -> fotograma a canvas -> blob + dataURL
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      const track = stream.getVideoTracks()[0];
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      await video.play();
+    async captureImage(videoEl) {
+      // Reusa el stream del preview (no abre una segunda cámara).
+      if (!videoEl || !videoEl.videoWidth) throw new Error("cámara no iniciada");
       const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
-      track.stop();
+      canvas.width = videoEl.videoWidth;
+      canvas.height = videoEl.videoHeight;
+      canvas.getContext("2d").drawImage(videoEl, 0, 0);
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.8));
       const href = await dataUrlFromBlob(blob);
       return { href, blob };

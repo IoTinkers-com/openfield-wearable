@@ -61,30 +61,35 @@ $("start").addEventListener("click", async () => {
   session = startSession({ deviceId, assetId: "asset-001" }, hw);
   queue.push({ kind: "doc", entity: "device", doc: createDevice(deviceId, hw) });
   queue.push({ kind: "doc", entity: "session", doc: session });
-  $("capture").disabled = false;
-  $("audio").disabled = false;
-  $("sync").disabled = false;
+  log("sesión iniciada: " + session.id);
   try {
+    if (stream) stream.getTracks().forEach((t) => t.stop()); // libera cámara previa
     stream = await navigator.mediaDevices.getUserMedia({ video: true });
     $("preview").srcObject = stream;
-  } catch (e) { log("cámara no disponible: " + e.message); }
-  log("sesión iniciada: " + session.id);
+    $("capture").disabled = false;
+    $("audio").disabled = false;
+    $("sync").disabled = false;
+  } catch (e) {
+    log("cámara no disponible: " + e.message + " (permite el acceso a la cámara)");
+  }
 });
 
 $("capture").addEventListener("click", async () => {
-  const img = await hw.captureImage(); // { href (dataURL), blob }
-  const doc = captureImage({ sessionId: session.id, assetId: "asset-001", href: img.href }, hw);
-  queue.push({ kind: "media", doc, blob: img.blob });
-  $("sync").textContent = `Sincronizar (${queue.length})`;
-  log("foto capturada: " + doc.id);
+  try {
+    const img = await hw.captureImage($("preview")); // reusa el stream del preview
+    const doc = captureImage({ sessionId: session.id, assetId: "asset-001", href: img.href }, hw);
+    queue.push({ kind: "media", doc, blob: img.blob });
+    $("sync").textContent = `Sincronizar (${queue.length})`;
+    log("foto capturada: " + doc.id);
+  } catch (e) { log("error al capturar: " + e.message); }
 });
 
-$("audio").addEventListener("click", async () => {
-  // Fase 1: se registra el audio; la transcripción (Whisper WASM por validar) es posterior.
-  const doc = recordAudio({ sessionId: session.id, assetId: "asset-001", engine: "placeholder", text: "(audio pendiente de transcripción)" }, hw);
+$("audio").addEventListener("click", () => {
+  // Fase 1: transcripción diferida (Whisper WASM por validar, ADR-0008). Aquí solo la nota de texto.
+  const doc = recordAudio({ sessionId: session.id, assetId: "asset-001", engine: "placeholder", text: "(audio pendiente de transcripción)" });
   queue.push({ kind: "doc", entity: "transcript", doc });
   $("sync").textContent = `Sincronizar (${queue.length})`;
-  log("audio registrado: " + doc.id);
+  log("nota registrada: " + doc.id);
 });
 
 $("sync").addEventListener("click", async () => {
