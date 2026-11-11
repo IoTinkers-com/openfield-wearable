@@ -11,7 +11,7 @@
   .row { margin: 0.75rem 0; }
   .indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #ccc; margin-right: 6px; }
   .indicator.on { background: #e11; }
-  #status { color: #555; font-size: 0.9rem; }
+  #status { color: #333; font-size: 1rem; font-weight: 600; min-height: 1.4rem; margin: 0.5rem 0; }
   button { padding: 0.5rem 1rem; margin-right: 0.5rem; }
   button:disabled { opacity: 0.5; }
   #log { white-space: pre-wrap; font-family: monospace; font-size: 0.8rem; background: #f5f5f5; padding: 0.5rem; min-height: 3rem; }
@@ -91,14 +91,25 @@ $("capture").addEventListener("click", async () => {
 });
 
 $("audio").addEventListener("click", async () => {
+  const status = $("status");
+  const btn = $("audio");
+  btn.disabled = true;
   try {
+    status.textContent = "🔴 Grabando… (3 s) — habla";
     const audio = await hw.recordAudio(); // graba y devuelve { blob }
+    status.textContent = "⏳ Transcribiendo…";
     const result = await transcribeAudio(audio.blob, BASE_URL); // { text, engine }
     const doc = recordAudio({ sessionId: session.id, assetId: "asset-001", engine: result.engine || "stub", text: result.text || "(sin transcripción)" });
     queue.push({ kind: "doc", entity: "transcript", doc });
     $("sync").textContent = `Sincronizar (${queue.length})`;
+    status.textContent = "✅ Transcrito (motor " + doc.engine + "): " + doc.text;
     log("transcripción: " + doc.id + " (motor " + doc.engine + ")");
-  } catch (e) { log("error audio: " + e.message); }
+  } catch (e) {
+    status.textContent = "❌ Error: " + e.message;
+    log("error audio: " + e.message);
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 $("sync").addEventListener("click", async () => {
