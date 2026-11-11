@@ -1,0 +1,12 @@
+{
+  "name": "openfield-wearable",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Captura de terreno de OpenField (IoTinkers): PWA + capa de hardware desacoplada.",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ajv": "^8.12.0"
+  }
+}
