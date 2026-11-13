@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { validate } from "../app/schema.js";
-import { captureImage, createDevice, recordAudio, startSession } from "../app/capture.js";
+import { captureImage, createDevice, recordAudio, recordNote, startSession, endSession } from "../app/capture.js";
 import { createQueue } from "../app/queue.js";
 
 test("device emite documento válido", () => {
@@ -25,6 +25,21 @@ test("transcript registra el motor (D7)", () => {
   const t = recordAudio({ sessionId: "sess-1", assetId: "asset-001", engine: "simulated" });
   validate("transcript", t);
   assert.equal(t.engine, "simulated");
+});
+
+test("endSession fija ended_at y sigue válido (ADR-0023)", async () => {
+  const s = await startSession({ deviceId: "dev-wear-001", assetId: "asset-001", operator: "Ana" });
+  const ended = endSession(s);
+  validate("session", ended);
+  assert.ok(ended.ended_at);
+  assert.equal(ended.operator, "Ana");
+});
+
+test("recordNote emite Observation 'note' válida (ADR-0023)", () => {
+  const n = recordNote({ sessionId: "sess-1", assetId: "asset-001", text: "Placa ilegible" });
+  validate("observation", n);
+  assert.equal(n.type, "note");
+  assert.equal(n.value, "Placa ilegible");
 });
 
 test("cola offline-first retiene y sincroniza (D4)", async () => {
