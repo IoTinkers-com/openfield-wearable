@@ -47,6 +47,40 @@ test("cola persistente sobrevive a 'recargar' (mismo store, otra instancia)", as
   assert.equal(await q2.count(), 1);
 });
 
+test("ítem editado se sincroniza con su valor actualizado (EC-6)", async () => {
+  const q = createPersistentQueue(createMemoryStore());
+  await q.enqueue({ kind: "doc", entity: "transcript", doc: { id: "tr-1", text: "original" } });
+  const [item] = await q.list();
+  await q.update(item.qid, { doc: { ...item.doc, text: "corregido" } });
+
+  const sent = [];
+  const res = await q.flush(async (it) => sent.push(it));
+  assert.equal(res.synced, 1);
+  assert.equal(sent[0].doc.text, "corregido");
+  assert.equal(await q.count(), 0);
+});
+
+test("ítem descartado no se sincroniza (EC-6)", async () => {
+  const q = createPersistentQueue(createMemoryStore());
+  await q.enqueue({ kind: "media", asset_id: "a-1", doc: { id: "m-1" } });
+  await q.enqueue({ kind: "doc", entity: "session", doc: { id: "s-1" } });
+  const [media] = await q.list();
+  await q.remove(media.qid);
+
+  const sent = [];
+  const res = await q.flush(async (it) => sent.push(it));
+  assert.equal(res.synced, 1);
+  assert.equal(sent[0].entity, "session");
+});
+
+test("desverificación: el ítem guarda snapshot asset_before para revertir", async () => {
+  const q = createPersistentQueue(createMemoryStore());
+  const before = { id: "a-1", name: "MOT", attribute_verification: { p: "pending" } };
+  await q.enqueue({ kind: "verify", asset_id: "a-1", payload: { op_id: "op-1" }, asset_before: before });
+  const [item] = await q.list();
+  assert.deepEqual(item.asset_before, before);
+});
+
 test("blob helpers: ida y vuelta {buffer,type}", async () => {
   const blob = new Blob(["hola"], { type: "text/plain" });
   const stored = await blobToStored(blob);
