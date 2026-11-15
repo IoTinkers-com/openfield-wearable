@@ -150,3 +150,31 @@ test("legacyVisits sintetiza la visita cuando el documento de sesión ya se sinc
   assert.equal(visits[0].asset_name, "Equipo 9");
   assert.equal(visits[0].started_at, "2026-11-14T09:05:00Z");
 });
+
+test("flujo asignar a equipo nuevo: alta en terreno + visita + asignación válida", async () => {
+  const { newFieldAsset } = await import("../app/assets.js");
+  const { captureImage } = await import("../app/capture.js");
+  const { validate } = await import("../app/schema.js");
+
+  // 1) captura sin equipo -> borrador
+  const draftDoc = await captureImage({ sessionId: null, assetId: null, geometry: null });
+  const draft = { qid: "q-new", kind: "media", draft: true, doc: draftDoc, created_at: "2026-11-15T10:00:00Z" };
+
+  // 2) alta de equipo en terreno (sin tipo)
+  const { asset } = newFieldAsset({
+    tenantId: "tenant-001", id: "asset-nuevo-1", identId: "ident-1", type: null,
+    name: "Equipo nuevo", tag: "TAG-N1", attributes: {}, lon: -70.6, lat: -33.4,
+  });
+  validate("asset", asset);
+
+  // 3) abrir la visita del equipo nuevo
+  const session = { id: "sess-nuevo", asset_id: asset.id, started_at: "2026-11-15T10:01:00Z", ended_at: null };
+  const visits = openVisit([], { session, asset });
+
+  // 4) asignar el borrador
+  const [patch] = assignDrafts([draft], currentVisit(visits), asset.location);
+  assert.equal(patch.patch.doc.session_id, "sess-nuevo");
+  assert.equal(patch.patch.doc.asset_id, asset.id);
+  validate("media-item", patch.patch.doc);
+  assert.equal(assignDrafts([{ qid: "q2", kind: "media", doc: draftDoc }], visits[0]).length, 0);
+});
