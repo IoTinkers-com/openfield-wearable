@@ -120,8 +120,11 @@ test("legacyVisits convierte sesiones de la cola en visitas", () => {
   assert.equal(cur.asset_name, "Dos");
   // idempotente: no duplica visitas ya registradas
   assert.equal(legacyVisits(items, visits, { uiSession }).length, visits.length);
-  // sin documento de sesión conocido no inventa visitas
-  assert.equal(legacyVisits([{ kind: "media", doc: { session_id: "S-x" } }], []).length, 0);
+  // sin documento de sesión la visita se sintetiza desde los ítems (para no dejar nada sin enviar)
+  const synthetic = legacyVisits([{ kind: "media", doc: { session_id: "S-x" } }], []);
+  assert.equal(synthetic.length, 1);
+  assert.equal(synthetic[0].id, "S-x");
+  assert.equal(synthetic[0].state, "closed");
 });
 
 test("describeCounts y sumCounts redactan en español", () => {
@@ -132,4 +135,18 @@ test("describeCounts y sumCounts redactan en español", () => {
     sumCounts([{ media: 2, audio: 1 }, { media: 3, verify: 1 }]),
     { media: 5, audio: 1, verify: 1, notes: 0 },
   );
+});
+
+test("legacyVisits sintetiza la visita cuando el documento de sesión ya se sincronizó", () => {
+  const items = [
+    { kind: "media", created_at: "2026-11-14T09:05:00Z", doc: { session_id: "S-gone", asset_id: "a9" } },
+    { kind: "audio", created_at: "2026-11-14T09:10:00Z", session_id: "S-gone", asset_id: "a9" },
+  ];
+  const visits = legacyVisits(items, [], { assetsById: { a9: { name: "Equipo 9" } }, nowIso: "2026-11-15T12:00:00Z" });
+  assert.equal(visits.length, 1);
+  assert.equal(visits[0].id, "S-gone");
+  assert.equal(visits[0].state, "closed");
+  assert.equal(visits[0].asset_id, "a9");
+  assert.equal(visits[0].asset_name, "Equipo 9");
+  assert.equal(visits[0].started_at, "2026-11-14T09:05:00Z");
 });
