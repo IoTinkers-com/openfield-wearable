@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  openVisit, closeVisit, markSynced, currentVisit, closedVisits, staleVisit, pruneSynced,
+  openVisit, closeVisit, markSynced, abortVisit, currentVisit, closedVisits, staleVisit, pruneSynced,
   assignDrafts, nearbyAssets, legacyVisits, describeCounts, sumCounts, STALE_MS,
 } from "../app/visits.js";
 import { captureImage } from "../app/capture.js";
@@ -177,4 +177,13 @@ test("flujo asignar a equipo nuevo: alta en terreno + visita + asignación váli
   assert.equal(patch.patch.doc.asset_id, asset.id);
   validate("media-item", patch.patch.doc);
   assert.equal(assignDrafts([{ qid: "q2", kind: "media", doc: draftDoc }], visits[0]).length, 0);
+});
+
+test("abortVisit descarta solo una visita abierta", () => {
+  const open = visitOpen();
+  const aborted = abortVisit(open, "sess-1");
+  assert.equal(aborted.length, 0);
+  const closed = closeVisit(open, "sess-1", "2026-11-15T11:00:00.000Z");
+  assert.throws(() => abortVisit(closed, "sess-1"), /abierta/);
+  assert.equal(abortVisit(open, "no-existe").length, 1);
 });
